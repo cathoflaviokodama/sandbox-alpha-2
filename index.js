@@ -1,3 +1,4 @@
+const qs = require('querystring');
 const vm = require('vm');
 const readline = require('readline');
 const express = require('express');
@@ -20,10 +21,16 @@ var sandbox = {
         }
     },
     request : request,
-    reql : function(path) {
-        request('http://localhost:9090'+path,(e,r,b) =>{
-            console.log(b);
-        });
+    reql : function(path,args) {
+        if(args) {
+            request.post('http://localhost:9090'+path,{form:args},(e,r,b) =>{
+                console.log(b);
+            });
+        } else {
+            request('http://localhost:9090'+path,(e,r,b) =>{
+                console.log(b);
+            });
+        }
     },
     quit : () => {
         
@@ -56,7 +63,7 @@ server.get("/*",(req,res) => {
                     res.end(p);
                     break;
                 case "[object Function]":
-                    p(req,res);
+                    p(req,res,{post:{}});
                     break;
                 case "[object Object]":
                     res.json(p);
@@ -67,6 +74,51 @@ server.get("/*",(req,res) => {
     }
     if(!found) res.status(404).end(req.url);
 });
+server.post("/*",(req,res) => {
+    var body = [];
+    req.on('data', function (data) {
+        body += data;
+        if (body.length > 1e6) req.connection.destroy();
+    });
+    req.on('end', function () {
+        var post = qs.parse(body);
+        var parts = req.url.split('?');
+        var found = true;
+        if(parts.length>0) {
+            var base_parts = parts[0].split("/");
+            base_parts.shift();
+            var p = sandbox.routes;
+            for(var x = 0; x < base_parts.length;x++) {
+                console.log(x,base_parts[x]);
+                if( base_parts[x] in p ) {
+                    p = p[ base_parts[x] ];
+                } else {
+                    found = false;
+                    break;
+                }
+            }
+            if(found) {
+                var type = Object.prototype.toString.apply(p);
+                switch(type) {
+                    case "[object Number]":
+                    case "[object String]":
+                        res.end(p);
+                        break;
+                    case "[object Function]":
+                        p(req,res,{
+                            post:post
+                        });
+                        break;
+                    case "[object Object]":
+                        res.json(p);
+                        break;
+                }
+            }
+        }
+        if(!found) res.status(404).end(req.url);
+    });
+});
+
 app.server = server.listen(9090);
 app.quit = function() { rl.close(); app.server.close(); };
 process.on('SIGTERM', () => { app.quit(); });
