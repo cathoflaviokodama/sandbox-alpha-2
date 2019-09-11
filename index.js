@@ -20,26 +20,28 @@ var sandbox = {
         }
     },
     request : request,
+    reql : function(path) {
+        request('http://localhost:9090'+path,(e,r,b) =>{
+            console.log(b);
+        });
+    },
     quit : () => {
         
         app.shell = false;
-    },
-    routes : {
-        helloString : "OK",
-        helloFunction : () => { res.end("helloFunction"); },
-        helloObject : { a: 1 }
     }
 };
+sandbox.routes = require('./routes.js');
+
 server.get("/*",(req,res) => {
     var parts = req.url.split('?');
     var found = true;
     if(parts.length>0) {
         var base_parts = parts[0].split("/");
+        base_parts.shift();
         var p = sandbox.routes;
         for(var x = 0; x < base_parts.length;x++) {
-            console.log(base_parts[x]);
+            console.log(x,base_parts[x]);
             if( base_parts[x] in p ) {
-                
                 p = p[ base_parts[x] ];
             } else {
                 found = false;
